@@ -5,87 +5,88 @@ using UnityEngine;
 
 public class AppleLogic : MonoBehaviour
 {
-    private SnakeController snakeController;    // snake controller script
-    private GameObject theSnake;                // the snake
-    private GameLogic gameLogic;                // game logic script
-    private GameObject theGame;                 // the game
+    public GameObject game;     // reference to GameObject game
 
-    private float currentX;                     // current x position
-    private float currentY;                     // current y position
+    private int[,] gameBoard;   // tracks snake head and body positions
 
-    private bool exists;
+    private SnakeHeadController snakeController;    // snake head controller script
+    private GameLogic gameLogic;                    // game logic script
 
-    private List<GameObject> snake;             // list of snake pos
-    private int length;
-    private bool spawnValid;
+    private float spawnX;       // apple spawn x position
+    private float spawnY;       // apple spawn y position
+    private int idxX;           // corresponding index X in gameBoard
+    private int idxY;           // corresponding index Y in gameBoard
+
+    private bool exists;        // whether apple currently exists
 
     // Start is called before the first frame update
     void Start()
     {
-        Debug.Log("Getting snake in GameLogic...");
-        theSnake = GameObject.Find("Snake");
-        snakeController = theSnake.GetComponent<SnakeController>();
+        Debug.Log("Getting gameLogic... (AppleLogic)");
+        gameLogic = game.GetComponent<GameLogic>();
 
-        Debug.Log("Getting game logic from GameLogic...");
-        theGame = GameObject.Find("Game");
-        gameLogic = theGame.GetComponent<GameLogic>();
+        Debug.Log("Grabbing gameBoard... (AppleLogic)");
+        gameBoard = gameLogic.getGameBoard();
 
-        Debug.Log("Initializing apple in AppleLogic...");
+        Debug.Log("Initializing parameters... (AppleLogic)");
         exists = false;
-        spawnValid = false;
     }
 
     // Update is called once per frame
     void Update()
     {
-        spawnApple();
-    }
-
-    public void setExists(bool state)
-    {
-        exists = state;
-    }
-
-    public void spawnApple()
-    {
         if (exists == false)
         {
-            while (!spawnValid)
-            {
-                var randomX = Random.Range(-20, 19);
-                var randomY = Random.Range(-20, 19);
-                currentX = (float)System.Math.Round(0.4 * randomX + 0.2, 1);
-                currentY = (float)System.Math.Round(0.4 * randomY + 0.2, 1);
-
-                if (checkSpawnValid())
-                {
-                    spawnValid = true;
-                }
-            }
-
-            Debug.Log("Spawned apple at: " + currentX + " " + currentY);
-
-            this.gameObject.transform.localPosition = new Vector3(currentX, currentY);
-            exists = true;
-            spawnValid = false;
-
+            spawnApple();
             gameLogic.setGrab(false);
         }
     }
 
-    public bool checkSpawnValid()
+    public void spawnApple()
     {
-        snake = snakeController.getSnake();
-        length = snakeController.getLength();
-
-        for (int i = 0; i <= length; i++)
+        do
         {
-            if ((float)System.Math.Round(snake[i].transform.localPosition.x, 1) == currentX &&
-                (float)System.Math.Round(snake[i].transform.localPosition.y, 1) == currentY)
-            {
-                return false;
-            }
-        }
-        return true;
+            int randomX = Random.Range(-20, 19);
+            int randomY = Random.Range(-20, 19);
+            spawnX = (float)System.Math.Round(gameLogic.getCellSize() * randomX + gameLogic.getOffset(), 1);
+            spawnY = (float)System.Math.Round(gameLogic.getCellSize() * randomY + gameLogic.getOffset(), 1);
+        } while (!checkSpawnValid(spawnX, spawnY));
+
+        Debug.Log("Spawned apple at: " + spawnX + " " + spawnY);
+
+        this.gameObject.transform.localPosition = new Vector3(spawnX, spawnY, 0);
+        exists = true;
+
+        //gameLogic.setGrab(false);
+    }
+
+    public bool checkSpawnValid(float x, float y)
+    {
+        idxX = (int)System.Math.Abs(System.Math.Round((x + gameLogic.getMax()) / gameLogic.getCellSize(), 1));
+        idxY = (int)System.Math.Abs(System.Math.Round((y + gameLogic.getMin()) / gameLogic.getCellSize(), 1));
+        if (gameBoard[idxY, idxX] == 0)
+            return true;
+        else
+            return false;
+    }
+
+    public void setExists(bool cond)
+    {
+        exists = cond;
+    }
+
+    public float getSpawnX()
+    {
+        return spawnX;
+    }
+
+    public float getSpawnY()
+    {
+        return spawnY;
+    }
+
+    public bool getExists()
+    {
+        return exists;
     }
 }

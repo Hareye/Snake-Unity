@@ -1,214 +1,193 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 public class GameLogic : MonoBehaviour
 {
-    private SnakeController snakeController;    // snake controller script
-    private GameObject theSnake;                // the snake
-    private AppleLogic appleLogic;              // apple logic script
-    private GameObject theApple;                // the apple
+    public GameObject snakeHead;    // reference to GameObject snakeHead
+    public GameObject snakeBody;    // reference to GameObject snakeBody
+    public GameObject apple;        // reference to GameObject apple
 
-    // formula = cells * cell_size - offset
-    // cells = 20, cell_size = 0.4, offset = 0.2
-    private float max_x = (float)7.8;  // map boundary in x axis
-    private float min_x = (float)-7.8; // map boundary in x axis
-    private float max_y = (float)7.8;  // map boundary in y axis
-    private float min_y = (float)-7.8; // map boundary in y axis
+    private SnakeHeadController snakeHeadController;    // reference to SnakeHeadController script
+    private SnakeBodyController snakeBodyController;    // reference to SnakeBodyController script
+    private AppleLogic appleLogic;                      // reference to AppleLogic script
 
-    private float snakeSpeed = 0.25f;
-    private bool gameOver;
-    private bool grab;
-    private bool continueCoroutine;
+    private int[,] gameBoard;
 
-    // Start is called before the first frame update
+    private float max = (float)7.8;         // max map boundary
+    private float min = (float)-7.8;        // max map boundary
+
+    private float cellSize = (float)0.4;    // how much to move
+    private float offset = (float)0.2;      // offset in the cell position
+
+    private bool gameOver;                  // whether game is over
+    private bool grab;                      // whether snake has grabbed apple
+
     void Start()
     {
-        Debug.Log("Getting snake in GameLogic...");
-        theSnake = GameObject.Find("Snake");
-        snakeController = theSnake.GetComponent<SnakeController>();
+        Debug.Log("Getting AppleLogic... (GameLogic)");
+        appleLogic = apple.GetComponent<AppleLogic>();
 
-        Debug.Log("Getting apple in GameLogic...");
-        theApple = GameObject.Find("Apple");
-        appleLogic = theApple.GetComponent<AppleLogic>();
+        Debug.Log("Getting SnakeHeadController... (GameLogic)");
+        snakeHeadController = snakeHead.GetComponent<SnakeHeadController>();
 
-        Debug.Log("Initializing game logic...");
-        gameOver = false;
+        Debug.Log("Getting SnakeBodyController... (GameLogic)");
+        snakeBodyController = snakeBody.GetComponent<SnakeBodyController>();
+
+        Debug.Log("Initializing gameBoard... (GameLogic)");
+        gameBoard = new int[40, 40];
+
+        float startX = (float)System.Math.Round(snakeHead.transform.localPosition.x, 1);
+        float startY = (float)System.Math.Round(snakeHead.transform.localPosition.y, 1);
+        addGameBoard(startX, startY);
+
+        Debug.Log("Initializing parameters... (GameLogic)");
         grab = false;
-        continueCoroutine = true;
-
-        StartCoroutine(moveSnake());
+        gameOver = false;
     }
 
-    // Update is called once per frame
     void Update()
     {
-        if (gameOver == false)
+        if (Input.GetKeyDown(KeyCode.O))
         {
-            // If snake grabbed apple (checked using same coordinates)
-            if ((theApple.transform.localPosition.x == theSnake.transform.localPosition.x) &&
-                (theApple.transform.localPosition.y == theSnake.transform.localPosition.y) &&
-                 grab == false)
-            {
-                grabApple();
-            }
+            // Print out current index of entire snake
+            SnakeHead sh = snakeHeadController.getSnakeHead();
+            SnakeBody sb;
 
-            // Key Press Events
-            if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
+            int idxX = (int)System.Math.Abs(System.Math.Round((snakeHead.transform.localPosition.x + max) / cellSize, 1));
+            int idxY = (int)System.Math.Abs(System.Math.Round((snakeHead.transform.localPosition.y + min) / cellSize, 1));
+
+            Debug.Log(idxX + "," + idxY);
+
+            if (sh.getNextObj() != null)
             {
-                if (!snakeController.checkUpHead())
+                sb = sh.getNextObj();
+
+                while (sb != null)
                 {
-                    Debug.Log("Up");
-                    snakeController.setUp();
-                } else
-                {
-                    Debug.Log("Cannot do that (up)");
-                }
-            }
-            else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
-            {
-                if (!snakeController.checkDownHead())
-                {
-                    Debug.Log("Down");
-                    snakeController.setDown();
-                } else
-                {
-                    Debug.Log("Cannot do that (down)");
-                }
-            }
-            else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
-            {
-                if (!snakeController.checkLeftHead())
-                {
-                    Debug.Log("Left");
-                    snakeController.setLeft();
-                } else
-                {
-                    Debug.Log("Cannot do that (left)");
-                }
-            }
-            else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
-            {
-                if (!snakeController.checkRightHead())
-                {
-                    Debug.Log("Right");
-                    snakeController.setRight();
-                } else
-                {
-                    Debug.Log("Cannot do that (right)");
+                    GameObject go = sb.getGameObj();
+
+                    idxX = (int)System.Math.Abs(System.Math.Round((go.transform.localPosition.x + max) / cellSize, 1));
+                    idxY = (int)System.Math.Abs(System.Math.Round((go.transform.localPosition.y + min) / cellSize, 1));
+
+                    Debug.Log(idxX + "," + idxY);
+
+                    sb = sb.getNextObj();
                 }
             }
         }
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            restartGame();
+        }
+
+        checkGrab();
+    }
+    
+    public void restartGame()
+    {
+        gameOver = false;
+        grab = false;
+
+        // Reset all snakeHead parameters
+        snakeHeadController.getSnakeHead().move((float)0.2, (float)0.2);
+        snakeHeadController.getSnakeHead().setDirection("");
+        snakeHeadController.setCoroutine(true);
+        snakeHeadController.setStarted(false);
+        snakeHeadController.setSpeed(0.25f);
+
+        // Destroy all SnakeBody GameObjects and remove reference from snakeHead
+        if (snakeHeadController.getSnakeHead().getNextObj() != null)
+        {
+            SnakeBody snakeBodyPtr = snakeHeadController.getSnakeHead().getNextObj();
+
+            while (snakeBodyPtr != null)
+            {
+                SnakeBody temp = snakeBodyPtr;
+                snakeBodyPtr = snakeBodyPtr.getNextObj();
+                Destroy(temp.getGameObj());
+            }
+
+            snakeHeadController.getSnakeHead().setNextObj(null);
+        }
+
+        // Reset snakeBody parameters
+        snakeBodyController.setLength(1);
+
+        // Respawn apple
+        appleLogic.spawnApple();
     }
 
-    public void setGrab(bool state)
+    public void addGameBoard(float x, float y)
     {
-        grab = state;
+        int idxX = (int)System.Math.Abs(System.Math.Round((x + max) / cellSize, 1));
+        int idxY = (int)System.Math.Abs(System.Math.Round((y + min) / cellSize, 1));
+        gameBoard[idxY, idxX] = 1;
     }
 
-    public void setGameOver(bool state)
+    public void removeGameBoard(float x, float y)
     {
-        gameOver = state;
+        int idxX = (int)System.Math.Abs(System.Math.Round((x + max) / cellSize, 1));
+        int idxY = (int)System.Math.Abs(System.Math.Round((y + min) / cellSize, 1));
+        gameBoard[idxY, idxX] = 0;
     }
 
-    public void setSpeed(float newSpeed)
+    public void checkGrab()
     {
-        Debug.Log("Changing speed to: " + newSpeed);
-        snakeSpeed = newSpeed;
+        if (snakeHeadController.getSnakeHead().getX() == appleLogic.getSpawnX() &&
+            snakeHeadController.getSnakeHead().getY() == appleLogic.getSpawnY() &&
+            appleLogic.getExists() && grab == false)
+        {
+            grabApple();
+        }
     }
 
-    public float getSpeed()
+    public void grabApple()
     {
-        return (float)System.Math.Round(snakeSpeed, 2);
-    }
-
-    private void grabApple()
-    {
-        /*  Flow
-         *  1. Set grab to true so that this function only runs once
-         *  2. Add length to snake (act as score)
-         *  3. Set values so that we are ready to spawn a new snake body at the coordinates where snake grabbed the apple
-         *  4. Set exists to false so that new apple will spawn with new coordinates
-         */
+        Debug.Log("Grabbed apple...");
         grab = true;
-        snakeController.newBody();
         appleLogic.setExists(false);
+        snakeBodyController.newBody();
     }
 
-    private IEnumerator moveSnake()
+    public void setGrab(bool c)
     {
-        while (continueCoroutine)
-        {
-            if (gameOver == false)
-            {
-
-                // Move snake
-                if (snakeController.getUp())
-                {
-                    snakeController.moveBody();
-                    snakeController.moveHeadUp();
-                }
-                else if (snakeController.getDown())
-                {
-                    snakeController.moveBody();
-                    snakeController.moveHeadDown();
-                }
-                else if (snakeController.getLeft())
-                {
-                    snakeController.moveBody();
-                    snakeController.moveHeadLeft();
-                }
-                else if (snakeController.getRight())
-                {
-                    snakeController.moveBody();
-                    snakeController.moveHeadRight();
-                }
-
-                snakeController.checkSnake();   // check whether snake has hit his own body
-                checkBoundaries();              // check whether snake has hit the wall
-                yield return new WaitForSeconds(snakeSpeed);
-
-            } else if (gameOver == true)
-            {
-                Debug.Log("Game Over...");
-                continueCoroutine = false;
-                StopCoroutine(moveSnake());
-            }
-        }
+        grab = c;
     }
 
-    private void checkBoundaries()
+    public void setGameOver(bool c)
     {
-        Vector3 currentPos = theSnake.transform.localPosition;
+        gameOver = c;
+    }
 
-        if (currentPos.x > max_x)
-        {
+    public int[,] getGameBoard()
+    {
+        return gameBoard;
+    }
 
-            Debug.Log("Died at: " + currentPos.x);
-            gameOver = true;
-            theSnake.SetActive(false);  // hide snake
+    public bool getGameOver()
+    {
+        return gameOver;
+    }
 
-        } else if (currentPos.x < min_x)
-        {
+    public float getCellSize()
+    {
+        return cellSize;
+    }
 
-            Debug.Log("Died at: " + currentPos.x);
-            gameOver = true;
-            theSnake.SetActive(false);  // hide snake
+    public float getOffset()
+    {
+        return offset;
+    }
 
-        } else if (currentPos.y > max_y)
-        {
+    public float getMax()
+    {
+        return max;
+    }
 
-            Debug.Log("Died at: " + currentPos.y);
-            gameOver = true;
-            theSnake.SetActive(false);  // hide snake
-
-        } else if (currentPos.y < min_y)
-        {
-
-            Debug.Log("Died at: " + currentPos.y);
-            gameOver = true;
-            theSnake.SetActive(false);  // hide snake
-
-        }
+    public float getMin()
+    {
+        return min;
     }
 }
