@@ -2,182 +2,193 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SnakeHeadController : MonoBehaviour, SnakeHead
+public class SnakeHeadController : MonoBehaviour
 {
+    public GameObject game;         // reference to GameObject game
 
-    // New SnakeHeadController script
+    private SnakeHead snakeHead;    // reference to SnakeHead class object
+    private GameLogic gameLogic;    // reference to GameLogic script
 
-    private GameLogic gameLogic;        // game logic script
-    private GameObject game;            // the game
+    private bool continueCoroutine;         // controls coroutine
+    private bool started;                   // whether movement has started
 
-    private GameObject currBody;    // current snake body
+    private float snakeSpeed = 0.25f;       // snake speed
+    private float maxSpeed = 0.05f;         // max snake speed
+    private float toMove = (float)0.4;      // how much to move
 
-    private string direction;       // direction of snakeHead
-
-    private float nextX;            // snakeHead next x position
-    private float nextY;            // snakeHead next y position
-    private float currX;            // snakeHead current x position
-    private float currY;            // snakeHead current y position
-
-    private int oldIdxX;            // snakeHead old board index X
-    private int oldIdxY;            // snakeHead old board index Y
-    private int newIdxX;            // snakeHead new board index X
-    private int newIdxY;            // snakeHead new board index Y
-
-    private float moveToX;          // x position to move snakeBody
-    private float moveToY;          // y position to move snakeBody
-
-    // Start is called before the first frame update
     void Start()
     {
         Debug.Log("Getting gameLogic... (SnakeHeadController)");
-        game = GameObject.Find("NewGame");
         gameLogic = game.GetComponent<GameLogic>();
+
+        Debug.Log("Creating SnakeHead object... (SnakeHeadController)");
+        snakeHead = new SnakeHead();
+        snakeHead.setGameLogic(gameLogic);
+
+        Debug.Log("Initializing parameters... (SnakeHeadController)");
+        continueCoroutine = true;
+        started = false;
     }
 
-    // Update is called once per frame
     void Update()
     {
-        // Nothing right now
+        if (!gameLogic.getGameOver())
+        {
+            if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                if (!snakeHead.checkInvalidMovement("up"))
+                {
+                    snakeHead.setDirection("up");
+                    if (started == false)
+                    {
+                        StartCoroutine(moveSnake());
+                        started = true;
+                    }
+                    //prepareMove();
+                }
+            }
+            else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                if (!snakeHead.checkInvalidMovement("down"))
+                {
+                    snakeHead.setDirection("down");
+                    if (started == false)
+                    {
+                        StartCoroutine(moveSnake());
+                        started = true;
+                    }
+                    //prepareMove();
+                }
+            }
+            else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
+            {
+                if (!snakeHead.checkInvalidMovement("left"))
+                {
+                    snakeHead.setDirection("left");
+                    if (started == false)
+                    {
+                        StartCoroutine(moveSnake());
+                        started = true;
+                    }
+                    //prepareMove();
+                }
+            }
+            else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
+            {
+                if (!snakeHead.checkInvalidMovement("right"))
+                {
+                    snakeHead.setDirection("right");
+                    if (started == false)
+                    {
+                        StartCoroutine(moveSnake());
+                        started = true;
+                    }
+                    //prepareMove();
+                }
+            }
+        }
     }
 
     public void prepareMove()
     {
-        switch (direction)
+        float nextX = 0;
+        float nextY = 0;
+
+        switch (snakeHead.getDirection())
         {
-            case "left":
-                // Grab next snakeHead pos
-                nextX = (float)System.Math.Round(this.gameObject.transform.localPosition.x - gameLogic.getToMove(), 1);
-                nextY = (float)System.Math.Round(this.gameObject.transform.localPosition.y, 1);
-                break;
-
-            case "right":
-                // Grab next snakeHead pos
-                nextX = (float)System.Math.Round(this.gameObject.transform.localPosition.x + gameLogic.getToMove(), 1);
-                nextY = (float)System.Math.Round(this.gameObject.transform.localPosition.y, 1);
-                break;
-
             case "up":
-                // Grab next snakeHead pos
-                nextX = (float)System.Math.Round(this.gameObject.transform.localPosition.x, 1);
-                nextY = (float)System.Math.Round(this.gameObject.transform.localPosition.y + gameLogic.getToMove(), 1);
+                nextX = (float)System.Math.Round(snakeHead.getGameObj().transform.localPosition.x, 1);
+                nextY = (float)System.Math.Round(snakeHead.getGameObj().transform.localPosition.y + toMove, 1);
                 break;
 
             case "down":
-                // Grab next snakeHead pos
-                nextX = (float)System.Math.Round(this.gameObject.transform.localPosition.x, 1);
-                nextY = (float)System.Math.Round(this.gameObject.transform.localPosition.y - gameLogic.getToMove(), 1);
+                nextX = (float)System.Math.Round(snakeHead.getGameObj().transform.localPosition.x, 1);
+                nextY = (float)System.Math.Round(snakeHead.getGameObj().transform.localPosition.y - toMove, 1);
+                break;
+
+            case "left":
+                nextX = (float)System.Math.Round(snakeHead.getGameObj().transform.localPosition.x - toMove, 1);
+                nextY = (float)System.Math.Round(snakeHead.getGameObj().transform.localPosition.y, 1);
+                break;
+
+            case "right":
+                nextX = (float)System.Math.Round(snakeHead.getGameObj().transform.localPosition.x + toMove, 1);
+                nextY = (float)System.Math.Round(snakeHead.getGameObj().transform.localPosition.y, 1);
                 break;
         }
 
-        checkMove();
-    }
-
-    public void checkMove()
-    {
-        if (gameLogic.checkValidBounds(nextX, nextY) && gameLogic.checkValidMove(nextX, nextY))
+        if (snakeHead.checkValidBounds(nextX, nextY) && snakeHead.checkValidMove(nextX, nextY))
         {
-            updateBoard();
-            moveSnake();
+            snakeHead.move(nextX, nextY);
+
+            if (snakeHead.getNextObj() != null)
+            {
+                SnakeBody snakeBodyPtr = snakeHead.getNextObj();
+
+                nextX = snakeHead.getOldX();
+                nextY = snakeHead.getOldY();
+
+                while (snakeBodyPtr != null)
+                {
+                    snakeBodyPtr.move(nextX, nextY);
+                    nextX = snakeBodyPtr.getOldX();
+                    nextY = snakeBodyPtr.getOldY();
+                    snakeBodyPtr = snakeBodyPtr.getNextObj();
+                }
+            }
+        } else
+        {
+            gameLogic.setGameOver(true);
         }
     }
 
-    public void moveSnake()
+    private IEnumerator moveSnake()
     {
-        currX = (float)System.Math.Round(this.gameObject.transform.localPosition.x, 1);
-        currY = (float)System.Math.Round(this.gameObject.transform.localPosition.y, 1);
-        this.gameObject.transform.localPosition = new Vector3(nextX, nextY, 0);
-
-        moveBody(currX, currY, 1);
-    }
-
-    public void moveBody(float x, float y, int idx)
-    {
-        string name = "SnakeBody" + idx.ToString();
-        currBody = GameObject.Find(name);
-
-        if (currBody != null)
+        while (continueCoroutine)
         {
-            moveToX = (float)System.Math.Round(currBody.transform.localPosition.x, 1);
-            moveToY = (float)System.Math.Round(currBody.transform.localPosition.y, 1);
-
-            oldIdxX = (int)System.Math.Abs(System.Math.Round((moveToX + gameLogic.getMax()) / gameLogic.getCellSize(), 1));
-            oldIdxY = (int)System.Math.Abs(System.Math.Round((moveToY + gameLogic.getMin()) / gameLogic.getCellSize(), 1));
-            gameLogic.removeBoard(oldIdxX, oldIdxY);
-
-            newIdxX = (int)System.Math.Abs(System.Math.Round((x + gameLogic.getMax()) / gameLogic.getCellSize(), 1));
-            newIdxY = (int)System.Math.Abs(System.Math.Round((y + gameLogic.getMin()) / gameLogic.getCellSize(), 1));
-            gameLogic.setBoard(currBody, newIdxX, newIdxY);
-
-            currBody.transform.localPosition = new Vector3(x, y, 1);
-            moveBody(moveToX, moveToY, idx + 1);
+            if (!gameLogic.getGameOver())
+            {
+                prepareMove();
+                //updateScore();
+                yield return new WaitForSeconds(snakeSpeed);
+            }
+            else if (gameLogic.getGameOver())
+            {
+                Debug.Log("Game Over...");
+                continueCoroutine = false;
+                StopCoroutine(moveSnake());
+            }
         }
     }
 
-    public void updateBoard()
+    public void setSpeed(float s)
     {
-        // Remove head in old gameBoard pos
-        oldIdxX = (int)System.Math.Abs(System.Math.Round((this.gameObject.transform.localPosition.x + gameLogic.getMax()) / gameLogic.getCellSize(), 1));
-        oldIdxY = (int)System.Math.Abs(System.Math.Round((this.gameObject.transform.localPosition.y + gameLogic.getMin()) / gameLogic.getCellSize(), 1));
-        gameLogic.removeBoard(oldIdxX, oldIdxY);
-        //Debug.Log("Removing: " + oldIdxY + "," + oldIdxX);
-
-        // Add head in new gameBoard pos
-        newIdxX = (int)System.Math.Abs(System.Math.Round((nextX + gameLogic.getMax()) / gameLogic.getCellSize(), 1));
-        newIdxY = (int)System.Math.Abs(System.Math.Round((nextY + gameLogic.getMin()) / gameLogic.getCellSize(), 1));
-        gameLogic.setBoard(this.gameObject, newIdxX, newIdxY);
-        //Debug.Log("Setting: " + newIdxY + "," + newIdxX);
+        if (snakeSpeed > maxSpeed)
+            snakeSpeed = s;
     }
 
-    public bool checkInvalidMovement(string movement)
+    public void setStarted(bool c)
     {
-        switch (movement)
-        {
-            case "left":
-                if (direction == "right")
-                    return true;
-                else
-                    return false;
-            case "right":
-                if (direction == "left")
-                    return true;
-                else
-                    return false;
-            case "up":
-                if (direction == "down")
-                    return true;
-                else
-                    return false;
-            case "down":
-                if (direction == "up")
-                    return true;
-                else
-                    return false;
-            default:
-                return false;
-        }
+        started = c;
     }
 
-    // Setter methods
-    public void setDirection(string dir)
+    public void setCoroutine(bool c)
     {
-        Debug.Log("Setting " + dir + "...");
-        direction = dir;
+        continueCoroutine = c;
     }
 
-    // Getter methods
-    public string getDirection()
+    public SnakeHead getSnakeHead()
     {
-        return direction;
+        return snakeHead;
     }
 
-    public float getSnakeHeadX()
+    public bool getStarted()
     {
-        return this.gameObject.transform.localPosition.x;
+        return started;
     }
 
-    public float getSnakeHeadY()
+    public float getSpeed()
     {
-        return this.gameObject.transform.localPosition.y;
+        return snakeSpeed;
     }
 }

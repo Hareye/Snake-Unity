@@ -1,273 +1,174 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 public class GameLogic : MonoBehaviour
 {
-    // New code using SnakeHeadController
+    public GameObject snakeHead;    // reference to GameObject snakeHead
+    public GameObject snakeBody;    // reference to GameObject snakeBody
+    public GameObject apple;        // reference to GameObject apple
 
-    private GameObject[,] gameBoard;    // tracks snake head and body positions
+    private SnakeHeadController snakeHeadController;    // reference to SnakeHeadController script
+    private SnakeBodyController snakeBodyController;    // reference to SnakeBodyController script
+    private AppleLogic appleLogic;                      // reference to AppleLogic script
 
-    private SnakeHeadController snakeHeadController;    // snake head controller script
-    private GameObject snakeHead;                       // snake head
+    private int[,] gameBoard;
 
-    private SnakeBodyController snakeBodyController;    // snake body controller script
+    private float max = (float)7.8;         // max map boundary
+    private float min = (float)-7.8;        // max map boundary
 
-    private AppleLogic appleLogic;          // apple logic script
-
-    private float startX;   // snake head starting X pos
-    private float startY;   // snake head starting Y pos
-    private int idxX;       // corresponding index X in gameBoard
-    private int idxY;       // corresponding index Y in gameBoard
-
-    private float max_x = (float)7.8;       // map boundary in x axis
-    private float min_x = (float)-7.8;      // map boundary in x axis
-    private float max_y = (float)7.8;       // map boundary in y axis
-    private float min_y = (float)-7.8;      // map boundary in y axis
-
-    private float cellSize = (float)0.4;    // cell size
-    private float toMove = (float)0.4;      // how much to move (0.4 per cell)
+    private float cellSize = (float)0.4;    // how much to move
     private float offset = (float)0.2;      // offset in the cell position
 
-    private float snakeSpeed = 0.25f;       // snake speed
-    private int snakeLength;                // snake length
     private bool gameOver;                  // whether game is over
-    private bool continueCoroutine;         // controls coroutine
     private bool grab;                      // whether snake has grabbed apple
-    private bool started;                   // whether game has started
 
-    // Start is called before the first frame update
     void Start()
     {
-        Debug.Log("Getting snakeHead... (GameLogic)");
-        snakeHead = GameObject.Find("SnakeHead");
+        Debug.Log("Getting AppleLogic... (GameLogic)");
+        appleLogic = apple.GetComponent<AppleLogic>();
+
+        Debug.Log("Getting SnakeHeadController... (GameLogic)");
         snakeHeadController = snakeHead.GetComponent<SnakeHeadController>();
 
-        Debug.Log("Getting appleLogic... (GameLogic)");
-        appleLogic = GameObject.Find("Apple").GetComponent<AppleLogic>();
+        Debug.Log("Getting SnakeBodyController... (GameLogic)");
+        snakeBodyController = snakeBody.GetComponent<SnakeBodyController>();
 
-        Debug.Log("Getting snakeBody... (SnakeBodyController)");
-        snakeBodyController = GameObject.Find("SnakeBody").GetComponent<SnakeBodyController>();
+        Debug.Log("Initializing gameBoard... (GameLogic)");
+        gameBoard = new int[40, 40];
 
-        Debug.Log("Initializing board... (GameLogic)");
-        gameBoard = new GameObject[40, 40];
-
-        // Store snakeHead into corresponding gameBoard index on start
-        startX = (float)System.Math.Round(snakeHead.transform.localPosition.x, 1);
-        startY = (float)System.Math.Round(snakeHead.transform.localPosition.y, 1);
-        idxX = (int)System.Math.Abs(System.Math.Round((startX + max_x) / 0.4, 1));
-        idxY = (int)System.Math.Abs(System.Math.Round((startY + min_x) / 0.4, 1));
-        gameBoard[idxY, idxX] = snakeHead;
+        float startX = (float)System.Math.Round(snakeHead.transform.localPosition.x, 1);
+        float startY = (float)System.Math.Round(snakeHead.transform.localPosition.y, 1);
+        addGameBoard(startX, startY);
 
         Debug.Log("Initializing parameters... (GameLogic)");
-        gameOver = false;
-        continueCoroutine = true;
         grab = false;
-        started = false;
-        snakeLength = 1;
+        gameOver = false;
     }
 
-    // Update is called once per frame
     void Update()
     {
+        if (Input.GetKeyDown(KeyCode.O))
+        {
+            // Print out current index of entire snake
+            SnakeHead sh = snakeHeadController.getSnakeHead();
+            SnakeBody sb;
+
+            int idxX = (int)System.Math.Abs(System.Math.Round((snakeHead.transform.localPosition.x + max) / cellSize, 1));
+            int idxY = (int)System.Math.Abs(System.Math.Round((snakeHead.transform.localPosition.y + min) / cellSize, 1));
+
+            Debug.Log(idxX + "," + idxY);
+
+            if (sh.getNextObj() != null)
+            {
+                sb = sh.getNextObj();
+
+                while (sb != null)
+                {
+                    GameObject go = sb.getGameObj();
+
+                    idxX = (int)System.Math.Abs(System.Math.Round((go.transform.localPosition.x + max) / cellSize, 1));
+                    idxY = (int)System.Math.Abs(System.Math.Round((go.transform.localPosition.y + min) / cellSize, 1));
+
+                    Debug.Log(idxX + "," + idxY);
+
+                    sb = sb.getNextObj();
+                }
+            }
+        }
         if (Input.GetKeyDown(KeyCode.R))
         {
-            snakeHead.transform.localPosition = new Vector3((float)0.2, (float)0.2, 1);
-            for (var i = 1; i < snakeLength; i++)
-            {
-                string name = "SnakeBody" + i.ToString();
-                GameObject obj = GameObject.Find(name);
-                Destroy(obj);
-            }
-            snakeBodyController.resetTail();
-            snakeSpeed = 0.25f;
-            Start();
+            restartGame();
         }
-        if (!gameOver)
+
+        checkGrab();
+    }
+    
+    public void restartGame()
+    {
+        gameOver = false;
+        grab = false;
+
+        // Reset all snakeHead parameters
+        snakeHeadController.getSnakeHead().move((float)0.2, (float)0.2);
+        snakeHeadController.getSnakeHead().setDirection("");
+        snakeHeadController.setCoroutine(true);
+        snakeHeadController.setStarted(false);
+        snakeHeadController.setSpeed(0.25f);
+
+        // Destroy all SnakeBody GameObjects and remove reference from snakeHead
+        if (snakeHeadController.getSnakeHead().getNextObj() != null)
         {
-            // Key press events
-            if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
-            {
-                if (!snakeHeadController.checkInvalidMovement("up"))
-                {
-                    snakeHeadController.setDirection("up");
-                    if (started == false)
-                    {
-                        StartCoroutine(moveSnake());
-                        started = true;
-                    }
-                    //snakeHeadController.prepareMove();
-                }
-            }
-            else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
-            {
-                if (!snakeHeadController.checkInvalidMovement("down"))
-                {
-                    snakeHeadController.setDirection("down");
-                    if (started == false)
-                    {
-                        StartCoroutine(moveSnake());
-                        started = true;
-                    }
-                    //snakeHeadController.prepareMove();
-                }
-            }
-            else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
-            {
-                if (!snakeHeadController.checkInvalidMovement("left"))
-                {
-                    snakeHeadController.setDirection("left");
-                    if (started == false)
-                    {
-                        StartCoroutine(moveSnake());
-                        started = true;
-                    }
-                    //snakeHeadController.prepareMove();
-                }
-            }
-            else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
-            {
-                if (!snakeHeadController.checkInvalidMovement("right"))
-                {
-                    snakeHeadController.setDirection("right");
-                    if (started == false)
-                    {
-                        StartCoroutine(moveSnake());
-                        started = true;
-                    }
-                    //snakeHeadController.prepareMove();
-                }
-            }
-            else if (Input.GetKeyDown(KeyCode.P))
-            {
-                // Just for development purposes - logs out snake position and whether corresponding array contains the correct object
-                startX = (float)System.Math.Round(snakeHead.transform.localPosition.x, 1);
-                startY = (float)System.Math.Round(snakeHead.transform.localPosition.y, 1);
-                idxX = (int)System.Math.Abs(System.Math.Round((startX + max_x) / 0.4, 1));
-                idxY = (int)System.Math.Abs(System.Math.Round((startY + min_x) / 0.4, 1));
-                Debug.Log("Head: " + idxY + "," + idxX);
+            SnakeBody snakeBodyPtr = snakeHeadController.getSnakeHead().getNextObj();
 
-                for (var i = 1; i < getSnakeLength(); i++)
-                {
-                    string name = "SnakeBody" + i.ToString();
-                    GameObject obj = GameObject.Find(name);
-                    idxX = (int)System.Math.Abs(System.Math.Round(((float)System.Math.Round(obj.transform.localPosition.x, 1) + getMax()) / getCellSize(), 1));
-                    idxY = (int)System.Math.Abs(System.Math.Round(((float)System.Math.Round(obj.transform.localPosition.y, 1) + getMin()) / getCellSize(), 1));
-                    Debug.Log("Body" + i + ": " + idxY + "," + idxX);
-                    //Debug.Log(gameBoard[idxY, idxX]);
-                }
-                //Debug.Log(gameBoard[idxY, idxX]);
-            }
-            else if (Input.GetKeyDown(KeyCode.O))
+            while (snakeBodyPtr != null)
             {
-                // Just for development purposes - adds new snakeBody to snake
-                snakeBodyController.newBody();
-                snakeLength++;
-            }
-            else if (Input.GetKeyDown(KeyCode.L))
-            {
-                Debug.Log("Length: " + snakeLength);
+                SnakeBody temp = snakeBodyPtr;
+                snakeBodyPtr = snakeBodyPtr.getNextObj();
+                Destroy(temp.getGameObj());
             }
 
-            // Check if snake grabs apple (checks using same coordinates after snake moves)
-            if (appleLogic.getSpawnX() == snakeHeadController.getSnakeHeadX() &&
-                appleLogic.getSpawnY() == snakeHeadController.getSnakeHeadY() &&
-                grab == false)
-            {
-                grabApple();
-            }
+            snakeHeadController.getSnakeHead().setNextObj(null);
+        }
+
+        // Reset snakeBody parameters
+        snakeBodyController.setLength(1);
+
+        // Respawn apple
+        appleLogic.spawnApple();
+    }
+
+    public void addGameBoard(float x, float y)
+    {
+        int idxX = (int)System.Math.Abs(System.Math.Round((x + max) / cellSize, 1));
+        int idxY = (int)System.Math.Abs(System.Math.Round((y + min) / cellSize, 1));
+        gameBoard[idxY, idxX] = 1;
+    }
+
+    public void removeGameBoard(float x, float y)
+    {
+        int idxX = (int)System.Math.Abs(System.Math.Round((x + max) / cellSize, 1));
+        int idxY = (int)System.Math.Abs(System.Math.Round((y + min) / cellSize, 1));
+        gameBoard[idxY, idxX] = 0;
+    }
+
+    public void checkGrab()
+    {
+        if (snakeHeadController.getSnakeHead().getX() == appleLogic.getSpawnX() &&
+            snakeHeadController.getSnakeHead().getY() == appleLogic.getSpawnY() &&
+            appleLogic.getExists() && grab == false)
+        {
+            grabApple();
         }
     }
 
     public void grabApple()
     {
+        Debug.Log("Grabbed apple...");
         grab = true;
-        snakeBodyController.newBody();
         appleLogic.setExists(false);
-        snakeLength++;
+        snakeBodyController.newBody();
     }
 
-    public bool checkValidMove(float nextX, float nextY)
+    public void setGrab(bool c)
     {
-        idxX = (int)System.Math.Abs(System.Math.Round((nextX + max_x) / 0.4, 1));
-        idxY = (int)System.Math.Abs(System.Math.Round((nextY + min_x) / 0.4, 1));
-        if (gameBoard[idxY, idxX] != null)
-        {
-            Debug.Log("Died at: " + snakeHead.transform.localPosition.x + "," + snakeHead.transform.localPosition.y);
-            gameOver = true;
-            return false;
-        }
-        return true;
+        grab = c;
     }
 
-    public bool checkValidBounds(float nextX, float nextY)
+    public void setGameOver(bool c)
     {
-        if (nextX > max_x || nextX < min_x || nextY > max_y || nextY < min_y)
-        {
-            Debug.Log("Died at: " + snakeHead.transform.localPosition.x + "," + snakeHead.transform.localPosition.y);
-            gameOver = true;
-            //snakeHead.SetActive(false);
-            return false;
-        }
-        return true;
+        gameOver = c;
     }
 
-    private IEnumerator moveSnake()
-    {
-        while (continueCoroutine)
-        {
-            if (gameOver == false)
-            {
-                snakeHeadController.prepareMove();
-                yield return new WaitForSeconds(snakeSpeed);
-            }
-            else if (gameOver == true)
-            {
-                Debug.Log("Game Over...");
-                continueCoroutine = false;
-                StopCoroutine(moveSnake());
-            }
-        }
-    }
-
-    public void setBoard(GameObject obj, int x, int y)
-    {
-        gameBoard[y, x] = obj;
-    }
-
-    public void setGrab(bool cond)
-    {
-        grab = cond;
-    }
-
-    public void setSpeed(float spd)
-    {
-        snakeSpeed = spd;
-    }
-
-    public void removeBoard(int x, int y)
-    {
-        gameBoard[y, x] = null;
-    }
-
-    public GameObject[,] getBoard()
+    public int[,] getGameBoard()
     {
         return gameBoard;
     }
 
-    public float getMax()
+    public bool getGameOver()
     {
-        return max_x;
-    }
-
-    public float getMin()
-    {
-        return min_x;
-    }
-
-    public float getToMove()
-    {
-        return toMove;
+        return gameOver;
     }
 
     public float getCellSize()
@@ -280,13 +181,13 @@ public class GameLogic : MonoBehaviour
         return offset;
     }
 
-    public int getSnakeLength()
+    public float getMax()
     {
-        return snakeLength;
+        return max;
     }
 
-    public float getSpeed()
+    public float getMin()
     {
-        return snakeSpeed;
+        return min;
     }
 }

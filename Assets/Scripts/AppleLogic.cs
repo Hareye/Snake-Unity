@@ -5,9 +5,9 @@ using UnityEngine;
 
 public class AppleLogic : MonoBehaviour
 {
-    // New code using SnakeHeadController and SnakeBodyController
+    public GameObject game;     // reference to GameObject game
 
-    private GameObject[,] gameBoard;                // tracks snake head and body positions
+    private int[,] gameBoard;   // tracks snake head and body positions
 
     private SnakeHeadController snakeController;    // snake head controller script
     private GameLogic gameLogic;                    // game logic script
@@ -18,16 +18,15 @@ public class AppleLogic : MonoBehaviour
     private int idxY;           // corresponding index Y in gameBoard
 
     private bool exists;        // whether apple currently exists
-    private bool spawnValid;    // whether apple is spawning in a valid location
 
     // Start is called before the first frame update
     void Start()
     {
         Debug.Log("Getting gameLogic... (AppleLogic)");
-        gameLogic = GameObject.Find("NewGame").GetComponent<GameLogic>();
+        gameLogic = game.GetComponent<GameLogic>();
 
         Debug.Log("Grabbing gameBoard... (AppleLogic)");
-        gameBoard = gameLogic.getBoard();
+        gameBoard = gameLogic.getGameBoard();
 
         Debug.Log("Initializing parameters... (AppleLogic)");
         exists = false;
@@ -45,33 +44,30 @@ public class AppleLogic : MonoBehaviour
 
     public void spawnApple()
     {
-        while (!spawnValid)
+        do
         {
             int randomX = Random.Range(-20, 19);
             int randomY = Random.Range(-20, 19);
             spawnX = (float)System.Math.Round(gameLogic.getCellSize() * randomX + gameLogic.getOffset(), 1);
             spawnY = (float)System.Math.Round(gameLogic.getCellSize() * randomY + gameLogic.getOffset(), 1);
-
-            checkSpawnValid(spawnX, spawnY);
-        }
+        } while (!checkSpawnValid(spawnX, spawnY));
 
         Debug.Log("Spawned apple at: " + spawnX + " " + spawnY);
 
-        this.gameObject.transform.localPosition = new Vector3(spawnX, spawnY);
+        this.gameObject.transform.localPosition = new Vector3(spawnX, spawnY, 0);
         exists = true;
-        spawnValid = false;
 
         //gameLogic.setGrab(false);
     }
 
-    public void checkSpawnValid(float x, float y)
+    public bool checkSpawnValid(float x, float y)
     {
         idxX = (int)System.Math.Abs(System.Math.Round((x + gameLogic.getMax()) / gameLogic.getCellSize(), 1));
         idxY = (int)System.Math.Abs(System.Math.Round((y + gameLogic.getMin()) / gameLogic.getCellSize(), 1));
-        if (gameBoard[idxY, idxX] == null)
-            spawnValid = true;
+        if (gameBoard[idxY, idxX] == 0)
+            return true;
         else
-            spawnValid = false;
+            return false;
     }
 
     public void setExists(bool cond)
@@ -87,5 +83,10 @@ public class AppleLogic : MonoBehaviour
     public float getSpawnY()
     {
         return spawnY;
+    }
+
+    public bool getExists()
+    {
+        return exists;
     }
 }

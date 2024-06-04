@@ -2,130 +2,83 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SnakeBodyController : MonoBehaviour, SnakeBody
+public class SnakeBodyController : MonoBehaviour
 {
-    private GameObject[,] gameBoard;                    // tracks snake head and body positions
+    public GameObject snakeHead;    // reference to GameObject snakeHead
+    public GameObject game;         // reference to GameObject game
 
-    private SnakeHeadController snakeHeadController;    // snake head controller script
-    private GameLogic gameLogic;                        // game logic script
+    private SnakeHeadController snakeHeadController;    // reference to SnakeHeadController script
+    private SnakeBody currentTail;                      // reference to current snake tail
 
-    private GameObject snakeBody;   // new snakeBody gameobject
-    private GameObject snakeTail;   // GameObject that is currently the snake tail
+    private int length; // snake length
+    private float toMove = (float)0.4;      // how much to move
 
-    private float newPosX;          // new body x position
-    private float newPosY;          // new body y position
-    private int idxX;               // snakeBody new board index X
-    private int idxY;               // snakeBody new board index Y
-
-    // Start is called before the first frame update
     void Start()
     {
-        Debug.Log("Getting gameLogic... (SnakeBodyController)");
-        gameLogic = GameObject.Find("NewGame").GetComponent<GameLogic>();
+        Debug.Log("Getting snakeHeadController... (SnakeBodyController)");
+        snakeHeadController = snakeHead.GetComponent<SnakeHeadController>();
 
-        Debug.Log("Getting snakeHead... (SnakeBodyController)");
-        snakeHeadController = GameObject.Find("SnakeHead").GetComponent<SnakeHeadController>();
-
-        Debug.Log("Initializing parameters... (SnakeBodyController)");
-        snakeTail = GameObject.Find("SnakeHead");
+        Debug.Log("Setting parameters... (SnakeBodyController)");
+        length = 1;
     }
 
-    // Update is called once per frame
     void Update()
     {
-        // Nothing happens
-    }
-
-    public void resetTail()
-    {
-        snakeTail = snakeTail = GameObject.Find("SnakeHead");
+        if (Input.GetKeyDown(KeyCode.P))
+        {
+            newBody();
+        }
     }
 
     public void newBody()
     {
-        snakeBody = Instantiate(GameObject.Find("SnakeBody"), new Vector3((float)20.2, (float)0.4, 10), Quaternion.identity);
-        snakeBody.name = "SnakeBody" + gameLogic.getSnakeLength();
+        // Instantiate new GameObject snakeBodyObj and SnakeBody snakeBody 
+        GameObject snakeBodyObj = Instantiate(GameObject.Find("SnakeBody"), new Vector3((float)4.2, (float)4.2, 0), Quaternion.identity);
+        SnakeBody snakeBody = new SnakeBody(snakeBodyObj);
+        snakeBody.setGameLogic(game.GetComponent<GameLogic>());
 
-        snakeBody.transform.parent = gameLogic.transform;
-        snakeBody.transform.localScale = new Vector3(1, 1, 1);
+        float nextX;
+        float nextY;
 
-        if (snakeTail == GameObject.Find("SnakeHead"))
-            initPosNewBody();
+        // Remove script from the new instantiated GameOBject
+        Destroy(snakeBodyObj.GetComponent<SnakeBodyController>());
+
+        snakeBodyObj.name = "SnakeBody" + length;
+        snakeBodyObj.transform.parent = GameObject.Find("Game").transform;
+        snakeBodyObj.transform.localScale = new Vector3(1, 1, 1);
+
+        if (snakeHeadController.getSnakeHead().getNextObj() == null)
+        {
+            // If only snakeHead exists, move new SnakeBody GameObject to SnakeHead old position
+            snakeHeadController.getSnakeHead().setNextObj(snakeBody);
+            nextX = snakeHeadController.getSnakeHead().getOldX();
+            nextY = snakeHeadController.getSnakeHead().getOldY();
+        }
         else
-            posNewBody();
-
-        if (gameLogic.getSpeed() > 0.05)
-            gameLogic.setSpeed((float)System.Math.Round((gameLogic.getSpeed() - 0.01f), 2));
-    }
-
-    public void posNewBody()
-    {
-        GameObject beforeTail = GameObject.Find("SnakeBody" + (gameLogic.getSnakeLength() - 2).ToString());
-
-        if (beforeTail == null)
-            beforeTail = GameObject.Find("SnakeHead");
-
-        float firstX = (float)System.Math.Round(beforeTail.transform.localPosition.x, 1);
-        float firstY = (float)System.Math.Round(beforeTail.transform.localPosition.y, 1);
-
-        if (firstX == (float)System.Math.Round(snakeTail.transform.localPosition.x + gameLogic.getToMove(), 1))
         {
-            // spawn left
-            newPosX = (float)System.Math.Round(snakeTail.transform.localPosition.x - gameLogic.getToMove(), 1);
-            newPosY = (float)System.Math.Round(snakeTail.transform.localPosition.y, 1);
-        } else if (firstX == (float)System.Math.Round(snakeTail.transform.localPosition.x - gameLogic.getToMove(), 1))
-        {
-            // spawn right
-            newPosX = (float)System.Math.Round(snakeTail.transform.localPosition.x + gameLogic.getToMove(), 1);
-            newPosY = (float)System.Math.Round(snakeTail.transform.localPosition.y, 1);
-        } else if (firstY == (float)System.Math.Round(snakeTail.transform.localPosition.y + gameLogic.getToMove(), 1))
-        {
-            // spawn down
-            newPosX = (float)System.Math.Round(snakeTail.transform.localPosition.x, 1);
-            newPosY = (float)System.Math.Round(snakeTail.transform.localPosition.y - gameLogic.getToMove(), 1);
-        } else if (firstY == (float)System.Math.Round(snakeTail.transform.localPosition.y - gameLogic.getToMove(), 1))
-        {
-            // spawn up
-            newPosX = (float)System.Math.Round(snakeTail.transform.localPosition.x, 1);
-            newPosY = (float)System.Math.Round(snakeTail.transform.localPosition.y + gameLogic.getToMove(), 1);
-        }
-        snakeBody.transform.localPosition = new Vector3(newPosX, newPosY, 1);
-        snakeTail = snakeBody;
-        updateBoard();
-    }
+            // If SnakeBody exists, move new SnakeBody GameObject to last SnakeBody old position
+            SnakeBody snakeBodyPtr = snakeHeadController.getSnakeHead().getNextObj();
+            nextX = snakeBodyPtr.getOldX();
+            nextY = snakeBodyPtr.getOldY();
 
-    public void initPosNewBody()
-    {
-        switch (snakeHeadController.getDirection())
-        {
-            case "left":
-                newPosX = (float)System.Math.Round(snakeTail.transform.localPosition.x + gameLogic.getToMove(), 1);
-                newPosY = (float)System.Math.Round(snakeTail.transform.localPosition.y, 1);
-                break;
-            case "right":
-                newPosX = (float)System.Math.Round(snakeTail.transform.localPosition.x - gameLogic.getToMove(), 1);
-                newPosY = (float)System.Math.Round(snakeTail.transform.localPosition.y, 1);
-                break;
-            case "up":
-                newPosX = (float)System.Math.Round(snakeTail.transform.localPosition.x, 1);
-                newPosY = (float)System.Math.Round(snakeTail.transform.localPosition.y - gameLogic.getToMove(), 1);
-                break;
-            case "down":
-                newPosX = (float)System.Math.Round(snakeTail.transform.localPosition.x, 1);
-                newPosY = (float)System.Math.Round(snakeTail.transform.localPosition.y + gameLogic.getToMove(), 1);
-                break;
+            while (snakeBodyPtr.getNextObj() != null)
+            {
+                nextX = snakeBodyPtr.getNextObj().getOldX();
+                nextY = snakeBodyPtr.getNextObj().getOldY();
+                snakeBodyPtr = snakeBodyPtr.getNextObj();
+            }
+
+            snakeBodyPtr.setNextObj(snakeBody);
         }
 
-        snakeBody.transform.localPosition = new Vector3(newPosX, newPosY, 1);
-        snakeTail = snakeBody;
-        updateBoard();
+        // Make the initial movement
+        snakeBody.initialMove(nextX, nextY);
+        snakeHeadController.setSpeed(snakeHeadController.getSpeed() - 0.01f);
+        length++;
     }
 
-    public void updateBoard()
+    public void setLength(int l)
     {
-        idxX = (int)System.Math.Abs(System.Math.Round((newPosX + gameLogic.getMax()) / gameLogic.getCellSize(), 1));
-        idxY = (int)System.Math.Abs(System.Math.Round((newPosY + gameLogic.getMin()) / gameLogic.getCellSize(), 1));
-        gameLogic.setBoard(this.gameObject, idxX, idxY);
-        //Debug.Log("Adding body to: " + idxY + "," + idxX);
+        length = l;
     }
 }
